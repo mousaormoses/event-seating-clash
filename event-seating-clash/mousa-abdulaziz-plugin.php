@@ -726,7 +726,7 @@ function esc_remove_booked_seats( $event_id, $seats ) {
  *
  * @return bool
  */
-function esc_validate_seat_selection( $passed, $product_id, $quantity, $variation_id, $variations, $cart_item_data ) {
+function esc_validate_seat_selection( $passed, $product_id, $quantity, $variation_id = null, $variations = [], $cart_item_data = [] ) {
     if ( ! function_exists( 'wc_add_notice' ) ) {
         return $passed;
     }
