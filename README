@@ -1,0 +1,18 @@
+# Event Seating Clash — WordPress plugin (empty starter)
+
+This is an empty starter WordPress plugin for the Event Seating Clash project.
+
+Developer
+- mousaormoses (https://github.com/mousaormoses)
+
+Installation
+1. Copy the `event-seating-clash-plugin` folder into `wp-content/plugins/` of your WordPress installation.
+2. Activate the plugin from the Plugins screen in WordPress admin.
+
+Developer notes
+- This plugin is intentionally minimal and contains placeholders for activation/deactivation hooks and a main plugin class.
+- Add functionality in the `Event_Seating_Clash` class or by including additional files (e.g., `includes/`).
+- Replace the plugin URI and Author URI with the correct project pages if needed.
+
+License
+GPL-2.0-or-later
