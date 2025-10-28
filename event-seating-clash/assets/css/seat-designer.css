@@ -1,0 +1,243 @@
+.esc-seat-designer__app {
+    background: #ffffff;
+    border: 1px solid #ccd0d4;
+    border-radius: 6px;
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.esc-seat-designer__intro,
+.esc-seat-designer__tips {
+    max-width: 720px;
+}
+
+.esc-designer-toolbar {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.esc-designer-panel {
+    background: #f9f9f9;
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    padding: 1rem;
+}
+
+.esc-designer-panel header {
+    margin-bottom: 0.75rem;
+}
+
+.esc-designer-panel__body {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.esc-designer-panel__hint {
+    display: block;
+    font-size: 12px;
+    color: #6c7781;
+}
+
+.esc-designer-panel label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-weight: 600;
+}
+
+.esc-designer-type,
+.esc-designer-group {
+    display: grid;
+    gap: 0.5rem;
+    background: #fff;
+    border: 1px solid #e2e4e7;
+    border-radius: 4px;
+    padding: 0.75rem;
+}
+
+.esc-designer-selection {
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    background: #fff;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    justify-content: space-between;
+}
+
+.esc-designer-selection__controls {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.esc-designer-selection__controls label {
+    display: flex;
+    gap: 0.35rem;
+    font-weight: 600;
+    align-items: center;
+}
+
+.esc-designer-section {
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: #f9f9f9;
+}
+
+.esc-designer-section__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.esc-designer-section__header label,
+.esc-designer-row__header label {
+    display: flex;
+    flex-direction: column;
+    font-weight: 600;
+    gap: 0.35rem;
+}
+
+.esc-designer-section__header input,
+.esc-designer-row__header input,
+.esc-designer-row__header select,
+.esc-designer-seat__fields input,
+.esc-designer-seat__fields select {
+    min-width: 160px;
+}
+
+.esc-designer-section__rows {
+    margin-top: 1rem;
+    display: grid;
+    gap: 1rem;
+}
+
+.esc-designer-row {
+    border: 1px dashed #c3c4c7;
+    border-radius: 6px;
+    padding: 1rem;
+    background: #fff;
+}
+
+.esc-designer-row__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.esc-designer-row__actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.esc-designer-row__seats {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.esc-designer-row__empty {
+    margin: 0;
+    font-style: italic;
+    color: #6c7781;
+}
+
+.esc-designer-seat {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-end;
+    padding: 0.75rem 1rem;
+    background: #f0f6ff;
+    border-radius: 6px;
+}
+
+.esc-designer-seat__meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.esc-designer-seat__select {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 600;
+}
+
+.esc-designer-seat__label {
+    font-weight: 600;
+}
+
+.esc-designer-seat__fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.esc-designer-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.esc-designer-status {
+    margin: 0;
+    font-weight: 600;
+}
+
+.esc-designer-status--success {
+    color: #007017;
+}
+
+.esc-designer-status--error {
+    color: #d63638;
+}
+
+.esc-designer-empty {
+    margin: 1rem 0;
+    font-style: italic;
+    color: #6c7781;
+}
+
+@media (max-width: 782px) {
+    .esc-designer-seat__fields,
+    .esc-designer-section__header,
+    .esc-designer-row__header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .esc-designer-panel label,
+    .esc-designer-section__header label,
+    .esc-designer-row__header label,
+    .esc-designer-seat__fields label {
+        width: 100%;
+    }
+
+    .esc-designer-section__header input,
+    .esc-designer-row__header input,
+    .esc-designer-row__header select,
+    .esc-designer-seat__fields input,
+    .esc-designer-seat__fields select {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .esc-designer-selection {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
