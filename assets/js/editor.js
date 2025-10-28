@@ -7,9 +7,231 @@ jQuery(document).ready(function ($) {
     const noSeatSelected = $('#esc-no-seat-selected');
     const seatTypeSelect = $('#esc-seat-type');
     const seatLabelInput = $('#esc-seat-label');
+    const alignHorizontalBtn = $('#esc-align-horizontal-btn');
+    const alignVerticalBtn = $('#esc-align-vertical-btn');
     let seats = [];
     let seatCounter = 1;
     let selectedSeat = null;
+    const selectedSeatIds = new Set();
+    let selectionRectElement = null;
+    let selectionStartPoint = null;
+
+    function getSeatById(id) {
+        return seats.find((seat) => seat.id === id);
+    }
+
+    function refreshSelectedSeatReference() {
+        if (selectedSeat && selectedSeatIds.has(selectedSeat.id)) {
+            return;
+        }
+
+        const lastId = Array.from(selectedSeatIds).pop();
+        selectedSeat = lastId ? getSeatById(lastId) : null;
+    }
+
+    function updatePropertiesPanel() {
+        if (selectedSeat) {
+            noSeatSelected.hide();
+            propertiesForm.show();
+            seatTypeSelect.val(selectedSeat.type);
+            seatLabelInput.val(selectedSeat.label);
+        } else {
+            propertiesForm.hide();
+            noSeatSelected.show();
+        }
+    }
+
+    function updateAlignmentButtons() {
+        const hasMultipleSelection = selectedSeatIds.size >= 2;
+        alignHorizontalBtn.prop('disabled', !hasMultipleSelection);
+        alignVerticalBtn.prop('disabled', !hasMultipleSelection);
+    }
+
+    function clearSelection(shouldUpdateUI = true) {
+        selectedSeatIds.clear();
+        selectedSeat = null;
+        $('.esc-seat-draggable').removeClass('is-selected');
+
+        if (shouldUpdateUI) {
+            updatePropertiesPanel();
+            updateAlignmentButtons();
+        }
+    }
+
+    function selectSeatsByIds(ids, additive = false) {
+        if (!Array.isArray(ids) || !ids.length) {
+            if (!additive) {
+                clearSelection();
+            }
+            return;
+        }
+
+        if (!additive) {
+            clearSelection(false);
+        }
+
+        ids.forEach((id) => {
+            const seat = getSeatById(id);
+
+            if (!seat) {
+                return;
+            }
+
+            const seatElement = $(`#${seat.id}`);
+
+            if (!seatElement.length) {
+                return;
+            }
+
+            selectedSeatIds.add(seat.id);
+            seatElement.addClass('is-selected');
+            selectedSeat = seat;
+        });
+
+        refreshSelectedSeatReference();
+        updatePropertiesPanel();
+        updateAlignmentButtons();
+    }
+
+    function selectSeat(seat, element, event = null) {
+        if (!seat || !element) {
+            return;
+        }
+
+        const allowMultiple = event && (event.ctrlKey || event.metaKey || event.shiftKey);
+
+        if (!allowMultiple) {
+            selectSeatsByIds([seat.id]);
+            return;
+        }
+
+        const alreadySelected = selectedSeatIds.has(seat.id);
+
+        if (allowMultiple && alreadySelected) {
+            selectedSeatIds.delete(seat.id);
+            element.removeClass('is-selected');
+        } else {
+            selectSeatsByIds([seat.id], true);
+            return;
+        }
+
+        refreshSelectedSeatReference();
+        updatePropertiesPanel();
+        updateAlignmentButtons();
+    }
+
+    canvas.on('mousedown', function (event) {
+        if (event.target !== canvas[0]) {
+            return;
+        }
+
+        event.preventDefault();
+
+        const canvasOffset = canvas.offset();
+        const startX = event.pageX - canvasOffset.left;
+        const startY = event.pageY - canvasOffset.top;
+        const additiveSelection = event.ctrlKey || event.metaKey || event.shiftKey;
+
+        selectionStartPoint = {
+            x: startX,
+            y: startY,
+            additive: additiveSelection,
+        };
+
+        if (!additiveSelection) {
+            clearSelection(false);
+        }
+
+        if (selectionRectElement) {
+            selectionRectElement.remove();
+        }
+
+        selectionRectElement = $('<div>', { class: 'esc-selection-rect' });
+        selectionRectElement.css({
+            left: startX,
+            top: startY,
+            width: 0,
+            height: 0,
+        });
+
+        canvas.append(selectionRectElement);
+
+        $(document).on('mousemove.escSelection', function (moveEvent) {
+            if (!selectionStartPoint || !selectionRectElement) {
+                return;
+            }
+
+            const currentX = moveEvent.pageX - canvasOffset.left;
+            const currentY = moveEvent.pageY - canvasOffset.top;
+
+            const rectLeft = Math.min(currentX, selectionStartPoint.x);
+            const rectTop = Math.min(currentY, selectionStartPoint.y);
+            const rectWidth = Math.abs(currentX - selectionStartPoint.x);
+            const rectHeight = Math.abs(currentY - selectionStartPoint.y);
+
+            selectionRectElement.css({
+                left: rectLeft,
+                top: rectTop,
+                width: rectWidth,
+                height: rectHeight,
+            });
+        });
+
+        $(document).on('mouseup.escSelection', function (upEvent) {
+            $(document).off('mousemove.escSelection');
+            $(document).off('mouseup.escSelection');
+
+            if (!selectionStartPoint) {
+                return;
+            }
+
+            const endOffset = canvas.offset();
+            const endX = upEvent.pageX - endOffset.left;
+            const endY = upEvent.pageY - endOffset.top;
+
+            const rectLeft = Math.min(selectionStartPoint.x, endX);
+            const rectTop = Math.min(selectionStartPoint.y, endY);
+            const rectRight = Math.max(selectionStartPoint.x, endX);
+            const rectBottom = Math.max(selectionStartPoint.y, endY);
+
+            if (selectionRectElement) {
+                selectionRectElement.remove();
+                selectionRectElement = null;
+            }
+
+            const selectedIds = [];
+
+            $('.esc-seat-draggable').each(function () {
+                const seatElement = $(this);
+                const position = seatElement.position();
+                const seatLeft = position.left;
+                const seatTop = position.top;
+                const seatRight = seatLeft + seatElement.outerWidth();
+                const seatBottom = seatTop + seatElement.outerHeight();
+
+                if (
+                    seatRight >= rectLeft &&
+                    seatLeft <= rectRight &&
+                    seatBottom >= rectTop &&
+                    seatTop <= rectBottom
+                ) {
+                    selectedIds.push(seatElement.attr('id'));
+                }
+            });
+
+            if (selectedIds.length) {
+                selectSeatsByIds(selectedIds, selectionStartPoint.additive);
+            } else if (!selectionStartPoint.additive) {
+                clearSelection();
+            } else {
+                updatePropertiesPanel();
+                updateAlignmentButtons();
+            }
+
+            selectionStartPoint = null;
+        });
+    });
+
 
     // Load seat map for the selected event
     eventSelect.on('change', function () {
@@ -24,7 +246,7 @@ jQuery(document).ready(function ($) {
             canvas.empty();
             seats = [];
             seatCounter = 1;
-            selectedSeat = null;
+            clearSelection();
         }
     });
 
@@ -40,9 +262,15 @@ jQuery(document).ready(function ($) {
             success: function (response) {
                 if (response.success) {
                     canvas.empty();
-                    seats = response.data.seat_map || [];
-                    seatCounter = seats.length ? Math.max(...seats.map(s => parseInt(s.label) || 0)) + 1 : 1;
-                    seats.forEach(renderSeat);
+                    clearSelection();
+                    seats = (response.data.seat_map || []).map((seat) => ({
+                        ...seat,
+                        top: parseInt(seat.top, 10) || 0,
+                        left: parseInt(seat.left, 10) || 0,
+                    }));
+                    seatCounter = seats.length ? Math.max(...seats.map((s) => parseInt(s.label, 10) || 0)) + 1 : 1;
+                    seats.forEach((seat) => renderSeat(seat));
+                    updateAlignmentButtons();
                 } else {
                     alert('Error loading seat map: ' + response.data.message);
                 }
@@ -64,7 +292,8 @@ jQuery(document).ready(function ($) {
             label: `${seatCounter}`,
         };
         seats.push(newSeat);
-        renderSeat(newSeat);
+        const seatElement = renderSeat(newSeat);
+        selectSeat(newSeat, seatElement);
         seatCounter++;
     });
 
@@ -112,20 +341,38 @@ jQuery(document).ready(function ($) {
 
         canvas.append(seatElement);
         makeDraggable(seatElement);
-        seatElement.on('click', () => selectSeat(seat, seatElement));
+        seatElement.on('click', (event) => {
+            event.stopPropagation();
+            selectSeat(seat, seatElement, event);
+        });
+
+        return seatElement;
     }
 
     // Make a seat element draggable
     function makeDraggable(element) {
         element.on('mousedown', function (e) {
-            const seatId = $(this).attr('id');
-            const seat = seats.find(s => s.id === seatId);
+            e.preventDefault();
+            e.stopPropagation();
+
+            const seatElement = $(this);
+            const seatId = seatElement.attr('id');
+            const seat = getSeatById(seatId);
+
+            if (!seat) {
+                return;
+            }
+
+            if (!selectedSeatIds.has(seat.id)) {
+                selectSeat(seat, seatElement, e);
+            }
+
             const initialX = e.clientX - seat.left;
             const initialY = e.clientY - seat.top;
 
-            $(document).on('mousemove', function (e) {
-                let newLeft = e.clientX - initialX;
-                let newTop = e.clientY - initialY;
+            $(document).on('mousemove', function (moveEvent) {
+                let newLeft = moveEvent.clientX - initialX;
+                let newTop = moveEvent.clientY - initialY;
 
                 newLeft = Math.max(0, Math.min(newLeft, canvas.width() - element.outerWidth()));
                 newTop = Math.max(0, Math.min(newTop, canvas.height() - element.outerHeight()));
@@ -140,23 +387,64 @@ jQuery(document).ready(function ($) {
                 $(document).off('mousemove');
                 $(document).off('mouseup');
 
-                seat.left = parseInt(element.css('left'));
-                seat.top = parseInt(element.css('top'));
+                seat.left = parseInt(element.css('left'), 10);
+                seat.top = parseInt(element.css('top'), 10);
             });
         });
     }
 
-    // Select a seat and show its properties
-    function selectSeat(seat, element) {
-        selectedSeat = seat;
-        $('.esc-seat-draggable').removeClass('is-selected');
-        element.addClass('is-selected');
+    function alignSelectedSeatsHorizontally() {
+        const ids = Array.from(selectedSeatIds);
 
-        noSeatSelected.hide();
-        propertiesForm.show();
+        if (ids.length < 2) {
+            return;
+        }
 
-        seatTypeSelect.val(seat.type);
-        seatLabelInput.val(seat.label);
+        const referenceSeat = getSeatById(ids[0]);
+
+        if (!referenceSeat) {
+            return;
+        }
+
+        const targetTop = parseInt(referenceSeat.top, 10) || 0;
+
+        ids.forEach((id) => {
+            const seat = getSeatById(id);
+
+            if (!seat) {
+                return;
+            }
+
+            seat.top = targetTop;
+            $(`#${seat.id}`).css('top', targetTop);
+        });
+    }
+
+    function alignSelectedSeatsVertically() {
+        const ids = Array.from(selectedSeatIds);
+
+        if (ids.length < 2) {
+            return;
+        }
+
+        const referenceSeat = getSeatById(ids[0]);
+
+        if (!referenceSeat) {
+            return;
+        }
+
+        const targetLeft = parseInt(referenceSeat.left, 10) || 0;
+
+        ids.forEach((id) => {
+            const seat = getSeatById(id);
+
+            if (!seat) {
+                return;
+            }
+
+            seat.left = targetLeft;
+            $(`#${seat.id}`).css('left', targetLeft);
+        });
     }
 
     // Update seat properties
@@ -172,4 +460,17 @@ jQuery(document).ready(function ($) {
             $(`#${selectedSeat.id}`).text(selectedSeat.label);
         }
     });
+
+    alignHorizontalBtn.on('click', function (event) {
+        event.preventDefault();
+        alignSelectedSeatsHorizontally();
+    });
+
+    alignVerticalBtn.on('click', function (event) {
+        event.preventDefault();
+        alignSelectedSeatsVertically();
+    });
+
+    updatePropertiesPanel();
+    updateAlignmentButtons();
 });

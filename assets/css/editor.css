@@ -8,11 +8,28 @@
     flex: 0 0 200px;
 }
 
+.esc-editor-toolbox .button {
+    display: block;
+    width: 100%;
+    margin-bottom: 0.5rem;
+}
+
+.esc-editor-toolbox .esc-toolbox-helper {
+    margin-top: 0.5rem;
+}
+
 .esc-editor-canvas {
     flex: 1;
     border: 1px solid #ccd0d4;
     position: relative;
     min-height: 500px;
+}
+
+.esc-editor-canvas .esc-selection-rect {
+    position: absolute;
+    border: 1px dashed #3f8efc;
+    background-color: rgba(63, 142, 252, 0.15);
+    pointer-events: none;
 }
 
 .esc-editor-properties {
