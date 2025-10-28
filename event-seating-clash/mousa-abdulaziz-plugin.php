@@ -297,13 +297,7 @@ function esc_prepare_seat_selection( $event_id, $selected ) {
         return new WP_Error( 'esc_invalid_event', __( 'The selected event could not be found.', 'event-seating-clash' ) );
     }
 
-    $rows     = (int) get_post_meta( $event_id, 'esc_seat_rows', true );
-    $cols     = (int) get_post_meta( $event_id, 'esc_seat_cols', true );
-    $seat_map = get_post_meta( $event_id, 'esc_seat_map', true );
-
-    if ( $rows <= 0 || $cols <= 0 || ! is_array( $seat_map ) ) {
-        return new WP_Error( 'esc_no_seats', __( 'Seats are not available for this event.', 'event-seating-clash' ) );
-    }
+    $custom_seat_map = get_post_meta( $event_id, 'esc_custom_seat_map', true );
 
     if ( ! is_array( $selected ) || empty( $selected ) ) {
         return new WP_Error( 'esc_empty_selection', __( 'Please choose at least one seat before booking.', 'event-seating-clash' ) );
@@ -315,47 +309,91 @@ function esc_prepare_seat_selection( $event_id, $selected ) {
     $normalized = [];
     $seen       = [];
 
-    foreach ( $selected as $entry ) {
-        if ( ! is_array( $entry ) || count( $entry ) < 2 ) {
-            return new WP_Error( 'esc_invalid_selection', __( 'Invalid seat selection provided.', 'event-seating-clash' ) );
+    if ( is_array( $custom_seat_map ) && ! empty( $custom_seat_map ) ) {
+        // Handle custom seat map validation
+        $custom_map_assoc = [];
+        foreach ( $custom_seat_map as $seat ) {
+            $custom_map_assoc[ $seat['id'] ] = $seat;
         }
 
-        $seat_id   = esc_convert_legacy_seat_id( $entry[0] );
-        $seat_type = sanitize_key( $entry[1] );
+        foreach ( $selected as $entry ) {
+            if ( ! is_array( $entry ) || count( $entry ) < 2 ) {
+                return new WP_Error( 'esc_invalid_selection', __( 'Invalid seat selection provided.', 'event-seating-clash' ) );
+            }
 
-        if ( ! isset( $seat_types[ $seat_type ] ) ) {
-            return new WP_Error( 'esc_invalid_type', __( 'One or more selected seats do not exist.', 'event-seating-clash' ) );
+            $seat_id   = sanitize_text_field( $entry[0] );
+            $seat_type = sanitize_key( $entry[1] );
+
+            if ( ! isset( $custom_map_assoc[ $seat_id ] ) || $custom_map_assoc[ $seat_id ]['type'] !== $seat_type ) {
+                return new WP_Error( 'esc_invalid_seat', __( 'One or more selected seats do not exist.', 'event-seating-clash' ) );
+            }
+
+            if ( isset( $booked_map[ $seat_id ] ) ) {
+                return new WP_Error(
+                    'esc_seat_booked',
+                    sprintf( __( 'Seat %s has already been booked. Please choose a different seat.', 'event-seating-clash' ), $seat_id )
+                );
+            }
+
+            if ( isset( $seen[ $seat_id ] ) ) {
+                continue;
+            }
+
+            $normalized[]   = [ $seat_id, $seat_type ];
+            $seen[ $seat_id ] = true;
+        }
+    } else {
+        // Fallback to grid-based validation
+        $rows     = (int) get_post_meta( $event_id, 'esc_seat_rows', true );
+        $cols     = (int) get_post_meta( $event_id, 'esc_seat_cols', true );
+        $seat_map = get_post_meta( $event_id, 'esc_seat_map', true );
+
+        if ( $rows <= 0 || $cols <= 0 || ! is_array( $seat_map ) ) {
+            return new WP_Error( 'esc_no_seats', __( 'Seats are not available for this event.', 'event-seating-clash' ) );
         }
 
-        $parsed = esc_parse_seat_identifier( $seat_id );
+        foreach ( $selected as $entry ) {
+            if ( ! is_array( $entry ) || count( $entry ) < 2 ) {
+                return new WP_Error( 'esc_invalid_selection', __( 'Invalid seat selection provided.', 'event-seating-clash' ) );
+            }
 
-        if ( ! $parsed ) {
-            return new WP_Error( 'esc_invalid_id', __( 'Invalid seat selection provided.', 'event-seating-clash' ) );
+            $seat_id   = esc_convert_legacy_seat_id( $entry[0] );
+            $seat_type = sanitize_key( $entry[1] );
+
+            if ( ! isset( $seat_types[ $seat_type ] ) ) {
+                return new WP_Error( 'esc_invalid_type', __( 'One or more selected seats do not exist.', 'event-seating-clash' ) );
+            }
+
+            $parsed = esc_parse_seat_identifier( $seat_id );
+
+            if ( ! $parsed ) {
+                return new WP_Error( 'esc_invalid_id', __( 'Invalid seat selection provided.', 'event-seating-clash' ) );
+            }
+
+            if ( ! isset( $seat_map[ $parsed['row'] ][ $parsed['column'] ] ) ) {
+                return new WP_Error( 'esc_out_of_bounds', __( 'One or more selected seats do not exist.', 'event-seating-clash' ) );
+            }
+
+            $stored_type = sanitize_key( $seat_map[ $parsed['row'] ][ $parsed['column'] ] );
+
+            if ( $stored_type !== $seat_type ) {
+                return new WP_Error( 'esc_type_mismatch', __( 'One or more selected seats do not exist.', 'event-seating-clash' ) );
+            }
+
+            if ( isset( $booked_map[ $seat_id ] ) ) {
+                return new WP_Error(
+                    'esc_seat_booked',
+                    sprintf( __( 'Seat %s has already been booked. Please choose a different seat.', 'event-seating-clash' ), $seat_id )
+                );
+            }
+
+            if ( isset( $seen[ $seat_id ] ) ) {
+                continue;
+            }
+
+            $normalized[]   = [ $seat_id, $seat_type ];
+            $seen[ $seat_id ] = true;
         }
-
-        if ( ! isset( $seat_map[ $parsed['row'] ][ $parsed['column'] ] ) ) {
-            return new WP_Error( 'esc_out_of_bounds', __( 'One or more selected seats do not exist.', 'event-seating-clash' ) );
-        }
-
-        $stored_type = sanitize_key( $seat_map[ $parsed['row'] ][ $parsed['column'] ] );
-
-        if ( $stored_type !== $seat_type ) {
-            return new WP_Error( 'esc_type_mismatch', __( 'One or more selected seats do not exist.', 'event-seating-clash' ) );
-        }
-
-        if ( isset( $booked_map[ $seat_id ] ) ) {
-            return new WP_Error(
-                'esc_seat_booked',
-                sprintf( __( 'Seat %s has already been booked. Please choose a different seat.', 'event-seating-clash' ), $seat_id )
-            );
-        }
-
-        if ( isset( $seen[ $seat_id ] ) ) {
-            continue;
-        }
-
-        $normalized[]   = [ $seat_id, $seat_type ];
-        $seen[ $seat_id ] = true;
     }
 
     if ( empty( $normalized ) ) {
@@ -388,6 +426,158 @@ function esc_add_event_metaboxes() {
     );
 }
 add_action( 'add_meta_boxes', 'esc_add_event_metaboxes' );
+
+/**
+ * Register the admin menu for the seat map editor.
+ */
+function esc_register_seat_map_editor_menu() {
+    add_submenu_page(
+        'edit.php?post_type=esc_event',
+        __( 'Seat Map Editor', 'event-seating-clash' ),
+        __( 'Seat Map Editor', 'event-seating-clash' ),
+        'manage_options',
+        'esc-seat-map-editor',
+        'esc_render_seat_map_editor_page'
+    );
+}
+add_action( 'admin_menu', 'esc_register_seat_map_editor_menu' );
+
+/**
+ * Render the seat map editor page.
+ */
+function esc_enqueue_editor_assets($hook) {
+    if ('esc_event_page_esc-seat-map-editor' !== $hook) {
+        return;
+    }
+
+    wp_enqueue_style(
+        'esc-seat-map-editor-styles',
+        plugin_dir_url(__FILE__) . 'assets/css/editor.css',
+        [],
+        '1.0.0'
+    );
+
+    wp_enqueue_script(
+        'esc-seat-map-editor-script',
+        plugin_dir_url(__FILE__) . 'assets/js/editor.js',
+        ['jquery'],
+        '1.0.0',
+        true
+    );
+
+    wp_localize_script(
+        'esc-seat-map-editor-script',
+        'escEditor',
+        [
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('esc-seat-map-editor-nonce'),
+        ]
+    );
+}
+add_action('admin_enqueue_scripts', 'esc_enqueue_editor_assets');
+
+function esc_render_seat_map_editor_page() {
+    ?>
+    <div class="wrap esc-seat-map-editor">
+        <h1><?php esc_html_e( 'Seat Map Editor', 'event-seating-clash' ); ?></h1>
+    <div class="esc-event-selector">
+        <label for="esc-event-select"><?php esc_html_e( 'Select an Event to Edit', 'event-seating-clash' ); ?></label>
+        <select id="esc-event-select" name="esc_event_id">
+            <option value=""><?php esc_html_e( '— Select an Event —', 'event-seating-clash' ); ?></option>
+            <?php
+            $events = get_posts([
+                'post_type' => 'esc_event',
+                'post_status' => 'any',
+                'numberposts' => -1,
+            ]);
+            foreach ($events as $event) {
+                echo '<option value="' . esc_attr($event->ID) . '">' . esc_html($event->post_title) . '</option>';
+            }
+            ?>
+        </select>
+    </div>
+        <div class="esc-editor-area">
+            <div id="esc-editor-toolbox" class="esc-editor-toolbox">
+                <h2><?php esc_html_e( 'Toolbox', 'event-seating-clash' ); ?></h2>
+            <button id="esc-add-seat-btn" class="button button-primary" disabled><?php esc_html_e( 'Add Seat', 'event-seating-clash' ); ?></button>
+            <button id="esc-save-map-btn" class="button button-secondary" disabled><?php esc_html_e( 'Save Map', 'event-seating-clash' ); ?></button>
+            </div>
+            <div id="esc-editor-canvas" class="esc-editor-canvas">
+                <!-- Seats will be rendered here -->
+            </div>
+            <div id="esc-editor-properties" class="esc-editor-properties">
+                <h2><?php esc_html_e( 'Properties', 'event-seating-clash' ); ?></h2>
+                <div id="esc-properties-content">
+    <div id="esc-no-seat-selected">
+        <p><?php esc_html_e( 'Select a seat to edit its properties.', 'event-seating-clash' ); ?></p>
+    </div>
+    <div id="esc-seat-properties-form" style="display: none;">
+        <p>
+            <label for="esc-seat-type"><?php esc_html_e( 'Seat Type', 'event-seating-clash' ); ?></label>
+            <select id="esc-seat-type" name="esc_seat_type" class="widefat">
+                <?php foreach ( esc_get_seat_types() as $type => $label ) : ?>
+                    <option value="<?php echo esc_attr( $type ); ?>"><?php echo esc_html( $label ); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </p>
+        <p>
+            <label for="esc-seat-label"><?php esc_html_e( 'Seat Label', 'event-seating-clash' ); ?></label>
+            <input type="text" id="esc-seat-label" name="esc_seat_label" class="widefat" />
+        </p>
+    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php
+}
+
+/**
+ * Handle the AJAX request to save the seat map.
+ */
+function esc_save_seat_map_ajax() {
+    check_ajax_referer('esc-seat-map-editor-nonce', 'nonce');
+
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(['message' => 'Permission denied.']);
+    }
+
+    $event_id = isset($_POST['event_id']) ? absint($_POST['event_id']) : 0;
+    $seats = isset($_POST['seats']) ? json_decode(stripslashes($_POST['seats']), true) : [];
+
+    if (empty($event_id)) {
+        wp_send_json_error(['message' => 'Invalid event ID.']);
+    }
+
+    update_post_meta($event_id, 'esc_custom_seat_map', $seats);
+
+    wp_send_json_success(['message' => 'Seat map saved successfully.']);
+}
+add_action('wp_ajax_esc_save_seat_map', 'esc_save_seat_map_ajax');
+
+/**
+ * Handle the AJAX request to load the seat map.
+ */
+function esc_load_seat_map_ajax() {
+    check_ajax_referer('esc-seat-map-editor-nonce', 'nonce');
+
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(['message' => 'Permission denied.']);
+    }
+
+    $event_id = isset($_GET['event_id']) ? absint($_GET['event_id']) : 0;
+
+    if (empty($event_id)) {
+        wp_send_json_error(['message' => 'Invalid event ID.']);
+    }
+
+    $seat_map = get_post_meta($event_id, 'esc_custom_seat_map', true);
+    $seat_map = is_array($seat_map) ? $seat_map : [];
+
+    wp_send_json_success(['seat_map' => $seat_map]);
+}
+add_action('wp_ajax_esc_load_seat_map', 'esc_load_seat_map_ajax');
+
 
 /**
  * Render the meta box that handles event details.
@@ -708,17 +898,22 @@ function esc_append_event_content( $content ) {
     }
 
     $post_id = get_the_ID();
+    $custom_seat_map = get_post_meta( $post_id, 'esc_custom_seat_map', true );
+    $is_custom_map = is_array( $custom_seat_map ) && ! empty( $custom_seat_map );
 
     $event_date     = get_post_meta( $post_id, 'esc_event_date', true );
     $event_time     = get_post_meta( $post_id, 'esc_event_time', true );
     $event_location = get_post_meta( $post_id, 'esc_event_location', true );
-    $rows          = (int) get_post_meta( $post_id, 'esc_seat_rows', true );
-    $cols          = (int) get_post_meta( $post_id, 'esc_seat_cols', true );
-    $seat_map      = get_post_meta( $post_id, 'esc_seat_map', true );
     $seat_products = esc_get_event_seat_products( $post_id );
 
-    if ( $rows <= 0 || $cols <= 0 || ! is_array( $seat_map ) ) {
-        return $content;
+    if ( ! $is_custom_map ) {
+        $rows = (int) get_post_meta( $post_id, 'esc_seat_rows', true );
+        $cols = (int) get_post_meta( $post_id, 'esc_seat_cols', true );
+        $seat_map = get_post_meta( $post_id, 'esc_seat_map', true );
+
+        if ( $rows <= 0 || $cols <= 0 || ! is_array( $seat_map ) ) {
+            return $content;
+        }
     }
 
     $seat_products = array_filter(
@@ -728,10 +923,19 @@ function esc_append_event_content( $content ) {
         }
     );
 
-    $seat_types     = esc_get_seat_types();
-    $booked         = esc_get_booked_seats( $post_id );
-    $used_types_map = esc_get_seat_types_in_map( $seat_map );
-    $used_types     = array_keys( $used_types_map );
+    $seat_types = esc_get_seat_types();
+    $booked     = esc_get_booked_seats( $post_id );
+
+    if ( $is_custom_map ) {
+        $used_types = [];
+        foreach ( $custom_seat_map as $seat ) {
+            $used_types[ $seat['type'] ] = true;
+        }
+        $used_types = array_keys( $used_types );
+    } else {
+        $used_types_map = esc_get_seat_types_in_map( $seat_map );
+        $used_types     = array_keys( $used_types_map );
+    }
 
     if ( empty( $used_types ) ) {
         return $content;
@@ -803,48 +1007,79 @@ function esc_append_event_content( $content ) {
                 <?php endforeach; ?>
             </ul>
         </div>
-        <div class="esc-seat-selection__grid">
-            <?php for ( $row = 0; $row < $rows; $row++ ) :
-                $row_label = esc_get_row_label( $row );
-                ?>
-                <div class="esc-seat-row">
-                    <span class="esc-seat-row__label"><?php echo esc_html( sprintf( __( 'Row %s', 'event-seating-clash' ), $row_label ) ); ?></span>
-                    <div class="esc-seat-row__seats">
-                        <?php for ( $col = 0; $col < $cols; $col++ ) :
-                            $seat_type = isset( $seat_map[ $row ][ $col ] ) ? sanitize_key( $seat_map[ $row ][ $col ] ) : '';
+        <div class="esc-seat-selection__grid<?php if ( $is_custom_map ) echo ' esc-seat-selection__grid--custom'; ?>">
+            <?php if ( $is_custom_map ) : ?>
+                <?php foreach ( $custom_seat_map as $seat ) :
+                    $seat_type = sanitize_key( $seat['type'] );
+                    $seat_id = sanitize_text_field( $seat['id'] );
+                    $has_product  = ! empty( $seat_products[ $seat_type ] );
+                    $is_booked    = in_array( $seat_id, $booked, true );
+                    $is_disabled  = $is_booked || ! $has_product || $booking_locked;
+                    $button_class = 'esc-seat esc-seat--' . sanitize_html_class( $seat_type );
 
-                            if ( ! isset( $seat_types[ $seat_type ] ) ) {
-                                $seat_type = array_key_first( $seat_types );
-                            }
+                    if ( $is_booked ) {
+                        $button_class .= ' is-booked';
+                    }
 
-                            $seat_id      = esc_format_seat_identifier( $row, $col );
-                            $has_product  = ! empty( $seat_products[ $seat_type ] );
-                            $is_booked    = in_array( $seat_id, $booked, true );
-                            $is_disabled  = $is_booked || ! $has_product || $booking_locked;
-                            $button_class = 'esc-seat esc-seat--' . sanitize_html_class( $seat_type );
+                    if ( ! $has_product || $booking_locked ) {
+                        $button_class .= ' is-unavailable';
+                    }
+                    ?>
+                    <button
+                        type="button"
+                        class="<?php echo esc_attr( $button_class ); ?>"
+                        data-seat="<?php echo esc_attr( $seat_id ); ?>"
+                        data-seat-type="<?php echo esc_attr( $seat_type ); ?>"
+                        style="top: <?php echo esc_attr( $seat['top'] ); ?>px; left: <?php echo esc_attr( $seat['left'] ); ?>px;"
+                        <?php echo $is_disabled ? 'disabled aria-disabled="true"' : 'aria-disabled="false"'; ?>
+                        aria-pressed="false"
+                    >
+                        <span class="esc-seat__label"><?php echo esc_html( $seat['label'] ); ?></span>
+                    </button>
+                <?php endforeach; ?>
+            <?php else : ?>
+                <?php for ( $row = 0; $row < $rows; $row++ ) :
+                    $row_label = esc_get_row_label( $row );
+                    ?>
+                    <div class="esc-seat-row">
+                        <span class="esc-seat-row__label"><?php echo esc_html( sprintf( __( 'Row %s', 'event-seating-clash' ), $row_label ) ); ?></span>
+                        <div class="esc-seat-row__seats">
+                            <?php for ( $col = 0; $col < $cols; $col++ ) :
+                                $seat_type = isset( $seat_map[ $row ][ $col ] ) ? sanitize_key( $seat_map[ $row ][ $col ] ) : '';
 
-                            if ( $is_booked ) {
-                                $button_class .= ' is-booked';
-                            }
+                                if ( ! isset( $seat_types[ $seat_type ] ) ) {
+                                    $seat_type = array_key_first( $seat_types );
+                                }
 
-                            if ( ! $has_product || $booking_locked ) {
-                                $button_class .= ' is-unavailable';
-                            }
-                            ?>
-                            <button
-                                type="button"
-                                class="<?php echo esc_attr( $button_class ); ?>"
-                                data-seat="<?php echo esc_attr( $seat_id ); ?>"
-                                data-seat-type="<?php echo esc_attr( $seat_type ); ?>"
-                                <?php echo $is_disabled ? 'disabled aria-disabled="true"' : 'aria-disabled="false"'; ?>
-                                aria-pressed="false"
-                            >
-                                <span class="esc-seat__label"><?php echo esc_html( $seat_id ); ?></span>
-                            </button>
-                        <?php endfor; ?>
+                                $seat_id      = esc_format_seat_identifier( $row, $col );
+                                $has_product  = ! empty( $seat_products[ $seat_type ] );
+                                $is_booked    = in_array( $seat_id, $booked, true );
+                                $is_disabled  = $is_booked || ! $has_product || $booking_locked;
+                                $button_class = 'esc-seat esc-seat--' . sanitize_html_class( $seat_type );
+
+                                if ( $is_booked ) {
+                                    $button_class .= ' is-booked';
+                                }
+
+                                if ( ! $has_product || $booking_locked ) {
+                                    $button_class .= ' is-unavailable';
+                                }
+                                ?>
+                                <button
+                                    type="button"
+                                    class="<?php echo esc_attr( $button_class ); ?>"
+                                    data-seat="<?php echo esc_attr( $seat_id ); ?>"
+                                    data-seat-type="<?php echo esc_attr( $seat_type ); ?>"
+                                    <?php echo $is_disabled ? 'disabled aria-disabled="true"' : 'aria-disabled="false"'; ?>
+                                    aria-pressed="false"
+                                >
+                                    <span class="esc-seat__label"><?php echo esc_html( $seat_id ); ?></span>
+                                </button>
+                            <?php endfor; ?>
+                        </div>
                     </div>
-                </div>
-            <?php endfor; ?>
+                <?php endfor; ?>
+            <?php endif; ?>
         </div>
         <form class="esc-seat-booking" method="post">
             <?php wp_nonce_field( 'esc_book_seats', 'esc_book_seats_nonce' ); ?>
@@ -903,6 +1138,13 @@ function esc_append_event_content( $content ) {
             margin-top: 1.5rem;
             display: grid;
             gap: 0.75rem;
+        }
+        .esc-seat-selection__grid--custom {
+            position: relative;
+            min-height: 500px; /* Adjust as needed */
+        }
+        .esc-seat-selection__grid--custom .esc-seat {
+            position: absolute;
         }
         .esc-seat-row {
             display: flex;
