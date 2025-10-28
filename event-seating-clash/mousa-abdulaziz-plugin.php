@@ -503,7 +503,7 @@ function esc_render_seat_map_editor_page() {
             <button id="esc-save-map-btn" class="button button-secondary" disabled><?php esc_html_e( 'Save Map', 'event-seating-clash' ); ?></button>
             <button id="esc-align-horizontal-btn" class="button" disabled><?php esc_html_e( 'Align Horizontally', 'event-seating-clash' ); ?></button>
             <button id="esc-align-vertical-btn" class="button" disabled><?php esc_html_e( 'Align Vertically', 'event-seating-clash' ); ?></button>
-            <p class="description esc-toolbox-helper"><?php esc_html_e( 'Hold Shift or Ctrl/Command and click seats to select multiple.', 'event-seating-clash' ); ?></p>
+            <p class="description esc-toolbox-helper"><?php esc_html_e( 'Hold Shift or Ctrl/Command while clicking seats, or drag on the canvas to draw a selection box.', 'event-seating-clash' ); ?></p>
             </div>
             <div id="esc-editor-canvas" class="esc-editor-canvas">
                 <!-- Seats will be rendered here -->

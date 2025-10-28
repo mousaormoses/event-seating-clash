@@ -25,6 +25,13 @@
     min-height: 500px;
 }
 
+.esc-editor-canvas .esc-selection-rect {
+    position: absolute;
+    border: 1px dashed #3f8efc;
+    background-color: rgba(63, 142, 252, 0.15);
+    pointer-events: none;
+}
+
 .esc-editor-properties {
     flex: 0 0 250px;
 }

@@ -13,6 +13,8 @@ jQuery(document).ready(function ($) {
     let seatCounter = 1;
     let selectedSeat = null;
     const selectedSeatIds = new Set();
+    let selectionRectElement = null;
+    let selectionStartPoint = null;
 
     function getSeatById(id) {
         return seats.find((seat) => seat.id === id);
@@ -56,6 +58,41 @@ jQuery(document).ready(function ($) {
         }
     }
 
+    function selectSeatsByIds(ids, additive = false) {
+        if (!Array.isArray(ids) || !ids.length) {
+            if (!additive) {
+                clearSelection();
+            }
+            return;
+        }
+
+        if (!additive) {
+            clearSelection(false);
+        }
+
+        ids.forEach((id) => {
+            const seat = getSeatById(id);
+
+            if (!seat) {
+                return;
+            }
+
+            const seatElement = $(`#${seat.id}`);
+
+            if (!seatElement.length) {
+                return;
+            }
+
+            selectedSeatIds.add(seat.id);
+            seatElement.addClass('is-selected');
+            selectedSeat = seat;
+        });
+
+        refreshSelectedSeatReference();
+        updatePropertiesPanel();
+        updateAlignmentButtons();
+    }
+
     function selectSeat(seat, element, event = null) {
         if (!seat || !element) {
             return;
@@ -64,7 +101,8 @@ jQuery(document).ready(function ($) {
         const allowMultiple = event && (event.ctrlKey || event.metaKey || event.shiftKey);
 
         if (!allowMultiple) {
-            clearSelection(false);
+            selectSeatsByIds([seat.id]);
+            return;
         }
 
         const alreadySelected = selectedSeatIds.has(seat.id);
@@ -73,9 +111,8 @@ jQuery(document).ready(function ($) {
             selectedSeatIds.delete(seat.id);
             element.removeClass('is-selected');
         } else {
-            selectedSeatIds.add(seat.id);
-            element.addClass('is-selected');
-            selectedSeat = seat;
+            selectSeatsByIds([seat.id], true);
+            return;
         }
 
         refreshSelectedSeatReference();
@@ -83,11 +120,118 @@ jQuery(document).ready(function ($) {
         updateAlignmentButtons();
     }
 
-    canvas.on('click', function (event) {
-        if (event.target === canvas[0]) {
-            clearSelection();
+    canvas.on('mousedown', function (event) {
+        if (event.target !== canvas[0]) {
+            return;
         }
+
+        event.preventDefault();
+
+        const canvasOffset = canvas.offset();
+        const startX = event.pageX - canvasOffset.left;
+        const startY = event.pageY - canvasOffset.top;
+        const additiveSelection = event.ctrlKey || event.metaKey || event.shiftKey;
+
+        selectionStartPoint = {
+            x: startX,
+            y: startY,
+            additive: additiveSelection,
+        };
+
+        if (!additiveSelection) {
+            clearSelection(false);
+        }
+
+        if (selectionRectElement) {
+            selectionRectElement.remove();
+        }
+
+        selectionRectElement = $('<div>', { class: 'esc-selection-rect' });
+        selectionRectElement.css({
+            left: startX,
+            top: startY,
+            width: 0,
+            height: 0,
+        });
+
+        canvas.append(selectionRectElement);
+
+        $(document).on('mousemove.escSelection', function (moveEvent) {
+            if (!selectionStartPoint || !selectionRectElement) {
+                return;
+            }
+
+            const currentX = moveEvent.pageX - canvasOffset.left;
+            const currentY = moveEvent.pageY - canvasOffset.top;
+
+            const rectLeft = Math.min(currentX, selectionStartPoint.x);
+            const rectTop = Math.min(currentY, selectionStartPoint.y);
+            const rectWidth = Math.abs(currentX - selectionStartPoint.x);
+            const rectHeight = Math.abs(currentY - selectionStartPoint.y);
+
+            selectionRectElement.css({
+                left: rectLeft,
+                top: rectTop,
+                width: rectWidth,
+                height: rectHeight,
+            });
+        });
+
+        $(document).on('mouseup.escSelection', function (upEvent) {
+            $(document).off('mousemove.escSelection');
+            $(document).off('mouseup.escSelection');
+
+            if (!selectionStartPoint) {
+                return;
+            }
+
+            const endOffset = canvas.offset();
+            const endX = upEvent.pageX - endOffset.left;
+            const endY = upEvent.pageY - endOffset.top;
+
+            const rectLeft = Math.min(selectionStartPoint.x, endX);
+            const rectTop = Math.min(selectionStartPoint.y, endY);
+            const rectRight = Math.max(selectionStartPoint.x, endX);
+            const rectBottom = Math.max(selectionStartPoint.y, endY);
+
+            if (selectionRectElement) {
+                selectionRectElement.remove();
+                selectionRectElement = null;
+            }
+
+            const selectedIds = [];
+
+            $('.esc-seat-draggable').each(function () {
+                const seatElement = $(this);
+                const position = seatElement.position();
+                const seatLeft = position.left;
+                const seatTop = position.top;
+                const seatRight = seatLeft + seatElement.outerWidth();
+                const seatBottom = seatTop + seatElement.outerHeight();
+
+                if (
+                    seatRight >= rectLeft &&
+                    seatLeft <= rectRight &&
+                    seatBottom >= rectTop &&
+                    seatTop <= rectBottom
+                ) {
+                    selectedIds.push(seatElement.attr('id'));
+                }
+            });
+
+            if (selectedIds.length) {
+                selectSeatsByIds(selectedIds, selectionStartPoint.additive);
+            } else if (!selectionStartPoint.additive) {
+                clearSelection();
+            } else {
+                updatePropertiesPanel();
+                updateAlignmentButtons();
+            }
+
+            selectionStartPoint = null;
+        });
     });
+
 
     // Load seat map for the selected event
     eventSelect.on('change', function () {
