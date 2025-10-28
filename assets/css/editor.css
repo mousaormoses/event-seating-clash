@@ -8,6 +8,16 @@
     flex: 0 0 200px;
 }
 
+.esc-editor-toolbox .button {
+    display: block;
+    width: 100%;
+    margin-bottom: 0.5rem;
+}
+
+.esc-editor-toolbox .esc-toolbox-helper {
+    margin-top: 0.5rem;
+}
+
 .esc-editor-canvas {
     flex: 1;
     border: 1px solid #ccd0d4;
