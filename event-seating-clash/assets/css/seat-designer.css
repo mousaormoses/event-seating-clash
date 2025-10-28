@@ -11,6 +11,79 @@
     max-width: 720px;
 }
 
+.esc-designer-toolbar {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.esc-designer-panel {
+    background: #f9f9f9;
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    padding: 1rem;
+}
+
+.esc-designer-panel header {
+    margin-bottom: 0.75rem;
+}
+
+.esc-designer-panel__body {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.esc-designer-panel__hint {
+    display: block;
+    font-size: 12px;
+    color: #6c7781;
+}
+
+.esc-designer-panel label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-weight: 600;
+}
+
+.esc-designer-type,
+.esc-designer-group {
+    display: grid;
+    gap: 0.5rem;
+    background: #fff;
+    border: 1px solid #e2e4e7;
+    border-radius: 4px;
+    padding: 0.75rem;
+}
+
+.esc-designer-selection {
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    background: #fff;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    justify-content: space-between;
+}
+
+.esc-designer-selection__controls {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.esc-designer-selection__controls label {
+    display: flex;
+    gap: 0.35rem;
+    font-weight: 600;
+    align-items: center;
+}
+
 .esc-designer-section {
     border: 1px solid #dcdcde;
     border-radius: 6px;
@@ -90,6 +163,23 @@
     border-radius: 6px;
 }
 
+.esc-designer-seat__meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.esc-designer-seat__select {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 600;
+}
+
+.esc-designer-seat__label {
+    font-weight: 600;
+}
+
 .esc-designer-seat__fields {
     display: flex;
     flex-wrap: wrap;
@@ -130,6 +220,13 @@
         align-items: stretch;
     }
 
+    .esc-designer-panel label,
+    .esc-designer-section__header label,
+    .esc-designer-row__header label,
+    .esc-designer-seat__fields label {
+        width: 100%;
+    }
+
     .esc-designer-section__header input,
     .esc-designer-row__header input,
     .esc-designer-row__header select,
@@ -137,5 +234,10 @@
     .esc-designer-seat__fields select {
         width: 100%;
         min-width: 0;
+    }
+
+    .esc-designer-selection {
+        flex-direction: column;
+        align-items: flex-start;
     }
 }
