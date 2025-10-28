@@ -496,6 +496,17 @@ function esc_render_event_seat_map_metabox( $post ) {
             <?php esc_html_e( 'Seats per row', 'event-seating-clash' ); ?>
             <input type="number" min="1" id="esc-seat-cols" name="esc_seat_cols" value="<?php echo esc_attr( $cols ); ?>" />
         </label>
+        <div class="esc-seat-map-bulk-controls">
+            <label>
+                <?php esc_html_e( 'Align selected to', 'event-seating-clash' ); ?>
+                <select id="esc-seat-align-type">
+                    <?php foreach ( $seat_types as $type => $label ) : ?>
+                        <option value="<?php echo esc_attr( $type ); ?>"><?php echo esc_html( $label ); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <button type="button" class="button" id="esc-seat-align-button"><?php esc_html_e( 'Align', 'event-seating-clash' ); ?></button>
+        </div>
     </div>
     <div id="esc-seat-map-grid"></div>
     <script>
@@ -505,6 +516,9 @@ function esc_render_event_seat_map_metabox( $post ) {
             const rowsInput = document.getElementById( 'esc-seat-rows' );
             const colsInput = document.getElementById( 'esc-seat-cols' );
             const grid = document.getElementById( 'esc-seat-map-grid' );
+            const alignButton = document.getElementById( 'esc-seat-align-button' );
+            const alignType = document.getElementById( 'esc-seat-align-type' );
+            const selectedSeats = new Set();
             let seatMap = <?php echo wp_json_encode( $seat_map ); ?> || [];
 
             const rowLabel = ( index ) => {
@@ -580,7 +594,38 @@ function esc_render_event_seat_map_metabox( $post ) {
 
                 grid.innerHTML = '';
                 grid.appendChild( table );
+                selectedSeats.clear();
+
+                table.addEventListener( 'click', ( e ) => {
+                    if ( e.target.nodeName !== 'TD' ) {
+                        return;
+                    }
+
+                    const td = e.target;
+                    const select = td.querySelector( 'select' );
+                    if ( ! select ) {
+                        return;
+                    }
+
+                    if ( selectedSeats.has( select ) ) {
+                        selectedSeats.delete( select );
+                        td.classList.remove( 'is-selected' );
+                    } else {
+                        selectedSeats.add( select );
+                        td.classList.add( 'is-selected' );
+                    }
+                } );
             };
+
+            alignButton.addEventListener( 'click', () => {
+                const type = alignType.value;
+                selectedSeats.forEach( ( select ) => {
+                    select.value = type;
+                    select.dispatchEvent( new Event( 'change', { bubbles: true } ) );
+                    select.closest( 'td' ).classList.remove( 'is-selected' );
+                } );
+                selectedSeats.clear();
+            } );
 
             rowsInput.addEventListener( 'change', renderSeatMap );
             colsInput.addEventListener( 'change', renderSeatMap );
@@ -592,6 +637,13 @@ function esc_render_event_seat_map_metabox( $post ) {
             display: flex;
             gap: 1rem;
             margin-bottom: 1rem;
+            align-items: flex-end;
+        }
+        .esc-seat-map-bulk-controls {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            margin-left: auto;
         }
         .esc-seat-map-controls label {
             display: flex;
@@ -607,6 +659,12 @@ function esc_render_event_seat_map_metabox( $post ) {
             border: 1px solid #ccd0d4;
             padding: 0.5rem;
             text-align: center;
+        }
+        .esc-seat-map-table td {
+            cursor: pointer;
+        }
+        .esc-seat-map-table td.is-selected {
+            box-shadow: inset 0 0 0 2px #2271b1;
         }
         .esc-seat-map-table th {
             background-color: #f1f1f1;
